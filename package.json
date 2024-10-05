@@ -1,0 +1,27 @@
+{
+  "name": "llm-key-proxy",
+  "version": "1.0.0",
+  "description": "a service to proxy llm connection",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Moskize91/llm-key-proxy.git"
+  },
+  "keywords": [
+    "llm",
+    "proxy"
+  ],
+  "author": "i@taozeyu.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Moskize91/llm-key-proxy/issues"
+  },
+  "homepage": "https://github.com/Moskize91/llm-key-proxy#readme",
+  "dependencies": {
+    "http-proxy": "^1.18.1",
+    "js-yaml": "^4.1.0"
+  }
+}

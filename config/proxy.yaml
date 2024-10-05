@@ -1,0 +1,4 @@
+- token: NAMED_TOKEN
+  authority: YOUR_API_URL
+  auth_list:
+    - YOUR_API_KEY
