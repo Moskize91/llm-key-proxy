@@ -9,7 +9,8 @@ import { fileURLToPath } from "url";
 const tokenMap = new Map();
 
 (async () => {
-  for (const { token, authority, auth_list } of await readYAML()) {
+  const { port, records } = await readYAML();
+  for (const { token, authority, auth_list } of records) {
     if (auth_list.length === 0) {
       continue;
     }
@@ -45,8 +46,8 @@ const tokenMap = new Map();
       });
       res.end(JSON.stringify({ error: `Internal Error: ${error}` }));
     }
-  }).listen(3000, () => {
-    console.log("Proxy server running on port 3000");
+  }).listen(port, () => {
+    console.log(`Proxy server running on port ${port}`);
   });
 
 })().catch((err) => {
