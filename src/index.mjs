@@ -3,6 +3,7 @@ import httpProxy from "http-proxy";
 import fsp from "fs/promises";
 import path from "path";
 import yaml from "js-yaml";
+import querystring from "querystring";
 
 import { fileURLToPath } from "url";
 
@@ -16,20 +17,18 @@ const tokenMap = new Map();
     }
     const handledAuthority = authority.replace(/\/$/, "");
     tokenMap.set(token, {
-      index: 0,
+      index: Math.ceil(auth_list.length * Math.random()),
       authority: handledAuthority,
       authList: auth_list,
     });
   }
-  const proxy = httpProxy.createProxyServer({});
+  const proxy = httpProxy.createProxyServer({
+    ws: true,
+  });
   http.createServer((req, res) => {
     try {
-      const proxyURL = handleRequest(req);
-      proxy.web(req, res, {
-        target: proxyURL,
-        ws: true,
-        changeOrigin: true,
-      });
+      const targetURL = handleRequest(req);
+      proxy.web(req, res, { target: targetURL });
       proxy.on("error", (err, req, res) => {
         if (!res.headersSent) {
           res.writeHead(500, {
@@ -65,32 +64,68 @@ async function readYAML() {
 function handleRequest(req) {
   let url = req.url;
   let auth = "";
-  // Remove the protocol and host (includes port) from the url
-  url = url.replace(/^\w+:\/\/[^\/][\w\.]+(:\d+)?/, "");
+  let auth_in_query = false;
+  let auth_in_headers_key = "";
+  let targetURL = "";
+  let queryParts = {};
 
-  console.log("Request URL:", url);
+  const cells = url.split("?");
 
-  const authorization = req.headers.authorization;
-  if (authorization) {
-    auth = authorization.replace(/^Bearer\s+/, "");
-    const value = tokenMap.get(auth);
-    if (value) {
-      const { authority, authList } = value;
-      console.log("Access Key", value.index + 1, "of", auth);
-      url = `${authority}${url}`;
-      auth = authList[value.index];
-      value.index += 1;
-      if (value.index >= authList.length) {
-        value.index = 0;
-      }
-    } else {
-      auth = "";
+  if (cells.length > 1) {
+    queryParts = querystring.parse(cells.pop());
+    const key = queryParts.key;
+    if (key) {
+      auth = key;
+      auth_in_query = true;
+      delete queryParts.key;
     }
   }
-  if (auth) {
-    req.headers.authorization = `Bearer ${auth}`;
+  // Remove the protocol and host (includes port) from the url
+  url = url.replace(/^\w+:\/\/[^\/][\w\.]+(:\d+)?/, "");
+  url = cells.join("?");
+
+  if (req.headers.authorization) {
+    auth = req.headers.authorization.replace(/^Bearer\s+/, "");
+    auth_in_headers_key = "authorization";
+  } else if (req.headers["x-goog-api-key"]) {
+    auth = req.headers["x-goog-api-key"];
+    auth_in_headers_key = "x-goog-api-key";
   }
-  return new URL(url);
+  if (!auth) {
+    throw new Error("Cannot read auth from request");
+  }
+  const value = tokenMap.get(auth);
+  if (!value) {
+    throw new Error(`cannot find authority for ${auth}`);
+  }
+  const { authority, authList } = value;
+  console.log("Access Key", value.index + 1, "of", auth);
+
+  targetURL = authority;
+  auth = authList[value.index];
+  // remove the protocol
+  req.headers.host = targetURL.replace(/^\w+:\/\//, "")
+                              .replace(/\/[^/]+/, "");
+
+  value.index += 1;
+  if (value.index >= authList.length) {
+    value.index = 0;
+  }
+  if (auth_in_query) {
+    queryParts.key = auth;
+  }
+  if (auth_in_headers_key) {
+    if (auth_in_headers_key === "authorization") {
+      auth = `Bearer ${auth}`;
+    }
+    req.headers[auth_in_headers_key] = auth;
+  }
+  for (const _ in queryParts) {
+    url += `?${querystring.stringify(queryParts)}`;
+    break;
+  }
+  req.url = url;
+  return targetURL;
 }
 
 // 服务器任何 promise unhandled 报错，不崩溃，直接打印报错
