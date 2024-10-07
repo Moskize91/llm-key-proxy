@@ -26,6 +26,7 @@ const tokenMap = new Map();
     ws: true,
   });
   http.createServer((req, res) => {
+    console.log("Request", req.method, req.url);
     try {
       const targetURL = handleRequest(req);
       proxy.web(req, res, { target: targetURL });
